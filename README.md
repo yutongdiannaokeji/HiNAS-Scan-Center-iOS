@@ -2,6 +2,8 @@
 
 原生 SwiftUI 客户端，连接现有 HiNAS + Brother MFC-1819。最低 iOS/iPadOS 16。应用接入现有的 8088 服务。
 
+使用 Xcode 26.3 和 iOS 26 SDK 构建，在 iOS 26 上使用系统 Liquid Glass 标签栏、工具栏和主操作按钮。iPad 使用可适应侧边栏的原生导航。旧版 iOS 使用对应的系统控件。界面采用动态字体、系统语义颜色、系统安全区域，并跟随减少动态效果、透明度和对比度等辅助功能设置。设计依据 [Apple Materials](https://developer.apple.com/design/human-interface-guidelines/materials) 与 [Adopting Liquid Glass](https://developer.apple.com/documentation/technologyoverviews/adopting-liquid-glass)。
+
 ## 使用
 
 1. iPhone/iPad 与 HiNAS 连接同一个家庭局域网。
@@ -25,7 +27,7 @@
 
 ## 本机编译
 
-需要带有 iOS SDK 的 Xcode 和 XcodeGen。
+需要带有 iOS 26 SDK 的 Xcode 26 或更新版本，以及 XcodeGen。编译目标最低 iOS 16。
 
 ```sh
 brew install xcodegen

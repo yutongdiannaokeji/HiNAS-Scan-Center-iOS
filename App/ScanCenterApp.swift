@@ -27,6 +27,7 @@ import SwiftUI
 
 struct RootView: View {
     @EnvironmentObject private var model: AppModel
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @AppStorage("darkAppearance") private var dark = false
     var body: some View {
         TabView(selection: $model.tab) {
@@ -35,8 +36,14 @@ struct RootView: View {
             PrintView().tabItem { Label("打印", systemImage: "printer") }.tag(2)
             ConnectionView().tabItem { Label("设备", systemImage: "wifi") }.tag(3)
         }
+        .adaptiveNavigation()
         .tint(Color(red: 0.16, green: 0.48, blue: 0.36))
         .preferredColorScheme(dark ? .dark : .light)
+        .environment(\.dynamicTypeSize, CommandLine.arguments.contains("--large-type") ? .accessibility2 : dynamicTypeSize)
+        .onAppear {
+            if let index = CommandLine.arguments.firstIndex(of: "--screen"), CommandLine.arguments.count > index + 1,
+               let tab = Int(CommandLine.arguments[index + 1]), (0...3).contains(tab) { model.tab = tab }
+        }
         .alert("请检查", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) {
             Button("知道了") { model.error = nil }
         } message: { Text(model.error ?? "") }
@@ -85,66 +92,68 @@ struct ConnectionView: View {
 
 struct ScanView: View {
     @EnvironmentObject private var model: AppModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var source: ScanSource = .feeder
     @State private var dpi = 600
     @State private var clearConfirmation = false
     var resolutions: [Int] { model.capabilities?.resolutions(for: source) ?? [300, 600] }
+
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    HStack(alignment: .top) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("纸上的故事，\n好好收起来。").font(.system(size: 31, weight: .semibold, design: .rounded))
-                            Text("Brother MFC-1819").foregroundStyle(.secondary)
+            List {
+                Section {
+                    HStack(spacing: 16) {
+                        Image(systemName: "scanner").font(.largeTitle).foregroundStyle(.tint)
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text("Brother MFC-1819").font(.headline)
+                            Text(model.connected ? "HiNAS 已连接" : "等待连接 HiNAS")
+                                .font(.subheadline).foregroundStyle(.secondary)
                         }
-                        Spacer()
-                        Image(systemName: "doc.text.viewfinder").font(.system(size: 43, weight: .light)).foregroundStyle(.tint).padding(.top, 8)
+                    }.padding(.vertical, 8).accessibilityElement(children: .combine)
+                }
+                Section("扫描来源") {
+                    Picker("扫描来源", selection: $source) {
+                        ForEach(ScanSource.allCases) { item in Text(item.title).tag(item) }
+                    }.pickerStyle(.segmented)
+                }.disabled(model.busy || model.pending != nil)
+                Section {
+                    Picker("分辨率", selection: $dpi) {
+                        ForEach(resolutions, id: \.self) { Text("\($0) dpi").tag($0) }
                     }
-                    .padding(24).frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.green.opacity(0.09), in: RoundedRectangle(cornerRadius: 26))
-
-                    if !model.connected {
-                        Button { model.tab = 3 } label: { Label("连接家中的 HiNAS", systemImage: "wifi") .frame(maxWidth: .infinity) }
-                            .buttonStyle(.borderedProminent).controlSize(.large)
+                    LabeledContent("原稿尺寸", value: "A4")
+                    LabeledContent("色彩", value: "24 位彩色")
+                    LabeledContent("扫描面", value: "单面")
+                } header: { Text("图像") } footer: {
+                    Text(dpi == 600 ? "600 dpi 适合细字和存档，采集与传输耗时更长。" : "扫描原图会按当前分辨率保存在手机中。")
+                }.disabled(model.busy || model.pending != nil)
+                Section {
+                    Label(source == .feeder ? "放入顶部托盘" : "放在玻璃上", systemImage: source.icon)
+                        .font(.headline)
+                    Text(source == .feeder
+                         ? "正面朝下，顶端先入。每批最多放入 10 张 A4 原稿。"
+                         : "先取出顶部托盘中的原稿，再将待扫描的一页放在玻璃上。")
+                        .foregroundStyle(.secondary)
+                }
+                Section {
+                    HStack(spacing: 12) {
+                        if model.busy { ProgressView().accessibilityLabel("扫描进行中") }
+                        Text(model.status)
                     }
-                    VStack(alignment: .leading, spacing: 18) {
-                        Text("扫描设置").font(.headline)
-                        Picker("扫描来源", selection: $source) {
-                            ForEach(ScanSource.allCases) { value in
-                                Label(value.title, systemImage: value.icon).tag(value)
-                            }
-                        }.pickerStyle(.segmented)
-                        Picker("分辨率", selection: $dpi) { ForEach(resolutions, id: \.self) { Text("\($0) dpi").tag($0) } }
-                        LabeledContent("原稿", value: "A4 · 彩色 · 单面")
-                        Text(source == .feeder ? "原稿放入顶部托盘，正面朝下，顶端先入。每批最多 10 张。" : "先取出顶部托盘的原稿，再将原稿放在玻璃上。")
-                            .font(.subheadline).foregroundStyle(.secondary)
-                        if dpi == 600 { Text("600 dpi 保留细字与图像细节，采集和传输需要更长时间。") .font(.footnote).foregroundStyle(.secondary) }
-                    }.padding(20).background(.background, in: RoundedRectangle(cornerRadius: 22))
-                    .disabled(model.busy || model.pending != nil)
-                    if model.pending == nil {
-                        Button { model.start(source: source, dpi: dpi) } label: {
-                            Label(source == .feeder ? "自动进稿扫描" : "平板扫描", systemImage: source.icon).frame(maxWidth: .infinity)
-                        }.buttonStyle(.borderedProminent).controlSize(.large).disabled(!model.connected || model.busy || (source == .feeder && model.capabilities?.supportsFeeder != true))
+                    if let value = model.progress {
+                        ProgressView(value: value) { Text("接收原图") }
+                            .animation(reduceMotion ? nil : .easeInOut, value: value)
                     }
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack { if model.busy { ProgressView() }; Text(model.status).font(.subheadline) }
-                        if let progress = model.progress { ProgressView(value: progress).animation(.easeInOut, value: progress) }
-                        if let pending = model.pending {
-                            if !model.busy, pending.jobID != nil {
-                                Button("继续接收原图") { model.resume() }.disabled(!model.connected)
-                            }
-                            if pending.jobID != nil {
-                                Button("停止盒子扫描", role: .destructive) { Task { await model.cancel() } }.disabled(!model.connected)
-                            }
-                            if !model.busy { Button("已检查设备，结束此次接收") { clearConfirmation = true }.font(.footnote) }
-                        }
-                    }.frame(maxWidth: .infinity, alignment: .leading)
-                }.padding(20).frame(maxWidth: 700)
-                .frame(maxWidth: .infinity)
+                    if model.pending != nil && !model.busy {
+                        Button("已检查设备，结束此次接收") { clearConfirmation = true }
+                    }
+                }
             }
-            .background(Color(uiColor: .systemGroupedBackground))
-            .navigationTitle("Scan Center").navigationBarTitleDisplayMode(.inline)
+            .navigationTitle("扫描")
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                actions.padding(.horizontal, 20).padding(.vertical, 12)
+                    .frame(maxWidth: 700).frame(maxWidth: .infinity)
+            }
             .onChange(of: source) { _ in normalizeDPI() }
             .onChange(of: model.connected) { _ in
                 if model.capabilities?.supportsFeeder != true { source = .flatbed }
@@ -152,8 +161,40 @@ struct ScanView: View {
             }
             .confirmationDialog("确认已检查盒子任务？", isPresented: $clearConfirmation, titleVisibility: .visible) {
                 Button("结束接收记录", role: .destructive) { model.clearPendingAfterCheck() }
-            } message: { Text("结束接收记录不会停止设备。请先确认原稿与在途扫描状态，再发起下一次扫描。") }
+            } message: {
+                Text("结束接收记录不会停止设备。请先确认原稿与在途扫描状态，再发起下一次扫描。")
+            }
         }
     }
-    private func normalizeDPI() { if !resolutions.contains(dpi), let last = resolutions.last { dpi = last } }
+
+    @ViewBuilder private var actions: some View {
+        if !model.connected {
+            Button { model.tab = 3 } label: {
+                Label("连接设备", systemImage: "wifi").frame(maxWidth: .infinity, minHeight: 28)
+            }.nativePrimaryAction().disabled(model.busy)
+        } else if let pending = model.pending {
+            HStack(spacing: 12) {
+                if !model.busy && pending.jobID != nil {
+                    Button { model.resume() } label: {
+                        Label("继续接收", systemImage: "arrow.down.doc").frame(maxWidth: .infinity, minHeight: 28)
+                    }.nativePrimaryAction()
+                }
+                if pending.jobID != nil {
+                    Button(role: .destructive) { Task { await model.cancel() } } label: {
+                        Label("停止扫描", systemImage: "stop.fill").frame(maxWidth: .infinity, minHeight: 28)
+                    }.nativeSecondaryAction()
+                }
+            }
+        } else {
+            Button { model.start(source: source, dpi: dpi) } label: {
+                Label(source == .feeder ? "自动进稿扫描" : "平板扫描", systemImage: source.icon)
+                    .frame(maxWidth: .infinity, minHeight: 28)
+            }.nativePrimaryAction()
+                .disabled(model.busy || (source == .feeder && model.capabilities?.supportsFeeder != true))
+        }
+    }
+
+    private func normalizeDPI() {
+        if !resolutions.contains(dpi), let last = resolutions.last { dpi = last }
+    }
 }

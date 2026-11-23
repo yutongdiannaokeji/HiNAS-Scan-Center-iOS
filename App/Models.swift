@@ -63,6 +63,7 @@ enum ScanSource: String, Codable, CaseIterable, Identifiable {
 }
 
 struct ScanOptions: Codable {
+    enum CodingKeys: String, CodingKey { case source, dpi, limit, mode, x, y, width, height, preview }
     var source = ScanSource.feeder
     var dpi = 600
     var limit = 10

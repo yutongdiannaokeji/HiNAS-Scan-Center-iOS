@@ -12,6 +12,8 @@ jobs:
   ios:
     runs-on: macos-15-intel
     timeout-minutes: 30
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Generate Xcode project
@@ -20,6 +22,7 @@ jobs:
           python3 tools/icon.py
           xcodegen generate
           xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
       - name: Build iPhone and iPad arm64 app
         timeout-minutes: 10
         run: |
@@ -29,7 +32,7 @@ jobs:
         timeout-minutes: 12
         run: |
           xcodebuild -project ScanCenter.xcodeproj -scheme ScanCenter -destination 'generic/platform=iOS Simulator' -derivedDataPath build/simulator CODE_SIGNING_ALLOWED=NO ARCHS=$(uname -m) build-for-testing > build-test.log 2>&1 || { tail -n 160 build-test.log; exit 1; }
-          python3 tools/simulator.py > /tmp/scan-center-simulator
+          python3 tools/simulator.py --family iPhone --major 26 > /tmp/scan-center-simulator
           DEVICE=$(cat /tmp/scan-center-simulator)
           xcodebuild -project ScanCenter.xcodeproj -scheme ScanCenter -destination "platform=iOS Simulator,id=$DEVICE" -derivedDataPath build/simulator -resultBundlePath build/tests.xcresult CODE_SIGNING_ALLOWED=NO test-without-building >> build-test.log 2>&1 || { tail -n 160 build-test.log; exit 1; }
           xcrun simctl install "$DEVICE" build/simulator/Build/Products/Debug-iphonesimulator/ScanCenter.app
@@ -37,6 +40,31 @@ jobs:
           sleep 4
           mkdir -p dist
           xcrun simctl io "$DEVICE" screenshot dist/iPhone.png
+          for SCREEN in 1 2 3; do
+            xcrun simctl terminate "$DEVICE" cyou.actart.scancenter
+            xcrun simctl launch "$DEVICE" cyou.actart.scancenter --screen "$SCREEN"
+            sleep 2
+            xcrun simctl io "$DEVICE" screenshot "dist/iPhone-$SCREEN.png"
+          done
+          xcrun simctl ui "$DEVICE" appearance dark
+          xcrun simctl terminate "$DEVICE" cyou.actart.scancenter
+          xcrun simctl launch "$DEVICE" cyou.actart.scancenter --screen 0
+          sleep 2
+          xcrun simctl io "$DEVICE" screenshot dist/iPhone-dark.png
+          xcrun simctl ui "$DEVICE" appearance light
+          xcrun simctl terminate "$DEVICE" cyou.actart.scancenter
+          xcrun simctl launch "$DEVICE" cyou.actart.scancenter --screen 0 --large-type
+          sleep 2
+          xcrun simctl io "$DEVICE" screenshot dist/iPhone-large-type.png
+      - name: Check native iPad layout
+        timeout-minutes: 8
+        run: |
+          python3 tools/simulator.py --family iPad --major 26 > /tmp/scan-center-ipad
+          DEVICE=$(cat /tmp/scan-center-ipad)
+          xcrun simctl install "$DEVICE" build/simulator/Build/Products/Debug-iphonesimulator/ScanCenter.app
+          xcrun simctl launch "$DEVICE" cyou.actart.scancenter
+          sleep 4
+          xcrun simctl io "$DEVICE" screenshot dist/iPad.png
       - name: Upload IPA and evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
