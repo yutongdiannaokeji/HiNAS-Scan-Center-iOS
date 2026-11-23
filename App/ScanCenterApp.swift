@@ -52,7 +52,7 @@ struct ConnectionView: View {
                 Section {
                     Label("Brother MFC-1819", systemImage: "printer.fill").font(.headline)
                     Label(model.connected ? "已连接 HiNAS" : "等待连接", systemImage: model.connected ? "checkmark.circle.fill" : "wifi")
-                        .foregroundStyle(model.connected ? .green : .secondary)
+                        .foregroundStyle(model.connected ? Color.green : Color.secondary)
                 }
                 Section("盒子地址") {
                     TextField("192.168.31.47", text: $model.host).keyboardType(.decimalPad).textInputAutocapitalization(.never).autocorrectionDisabled()

@@ -181,6 +181,11 @@ import SwiftUI
 
     func submitPrint() {
         guard !printing, printReceipt == nil, let file = printFile, let client, printCaps?.ready == true else { return }
+        let size = (try? FileManager.default.attributesOfItem(atPath: file.path)[.size] as? NSNumber)?.int64Value ?? 0
+        guard size > 0 && size <= 16 * 1024 * 1024 else {
+            error = "盒子入口最多接收 16 MiB。较大的 PDF 请使用 AirPrint。"
+            return
+        }
         let mime = file.pathExtension.lowercased() == "pdf" ? "application/pdf" : "text/plain"
         let id = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
         printReceipt = PendingPrint(requestID: id, server: client.address)

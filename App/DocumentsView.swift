@@ -108,7 +108,9 @@ struct DocumentDetail: View {
                             Button("删除页", role: .destructive) { do { try library.removePage(page.id, document: id) } catch { model.error = model.readable(error) } }.disabled(locked)
                         }
                         .contextMenu {
-                            Button("分享 PNG 原图", systemImage: "square.and.arrow.up") { sharing = ShareItem(url: library.pageURL(page, document: id)) }
+                            Button { sharing = ShareItem(url: library.pageURL(page, document: id)) } label: {
+                                Label("分享 PNG 原图", systemImage: "square.and.arrow.up")
+                            }
                         }
                     }
                     .onMove { offsets, target in do { try library.reorder(offsets, to: target, document: id) } catch { model.error = model.readable(error) } }
