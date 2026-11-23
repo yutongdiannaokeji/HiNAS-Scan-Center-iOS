@@ -17,7 +17,7 @@ concurrency:
 jobs:
   ios:
     name: iOS 26 - ${{ matrix.family }}
-    runs-on: ${{ matrix.family == 'iPad' && 'macos-15' || 'macos-15-intel' }}
+    runs-on: macos-15-intel
     strategy:
       fail-fast: false
       matrix:
@@ -48,7 +48,11 @@ jobs:
         timeout-minutes: 8
         run: |
           xcrun simctl shutdown all
-          python3 tools/simulator.py --family '${{ matrix.family }}' --major 26 > /tmp/scan-center-device
+          if [ '${{ matrix.family }}' = 'iPad' ]; then
+            python3 -u tools/simulator.py --family iPad --model-prefix 'iPad mini' --major 26 > /tmp/scan-center-device
+          else
+            python3 -u tools/simulator.py --family iPhone --major 26 > /tmp/scan-center-device
+          fi
       - name: Verify visible screens and PDF behavior
         timeout-minutes: 10
         run: |
