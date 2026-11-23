@@ -22,9 +22,10 @@ jobs:
           xcodebuild -version
       - name: Build and test simulator
         run: |
+          xcodebuild -project ScanCenter.xcodeproj -scheme ScanCenter -destination 'generic/platform=iOS Simulator' -derivedDataPath build/simulator CODE_SIGNING_ALLOWED=NO ARCHS=$(uname -m) build-for-testing > build-test.log 2>&1 || { tail -n 160 build-test.log; exit 1; }
           python3 tools/simulator.py > /tmp/scan-center-simulator
           DEVICE=$(cat /tmp/scan-center-simulator)
-          xcodebuild -project ScanCenter.xcodeproj -scheme ScanCenter -destination "platform=iOS Simulator,id=$DEVICE" -derivedDataPath build/simulator -resultBundlePath build/tests.xcresult CODE_SIGNING_ALLOWED=NO test > build-test.log 2>&1 || { tail -n 160 build-test.log; exit 1; }
+          xcodebuild -project ScanCenter.xcodeproj -scheme ScanCenter -destination "platform=iOS Simulator,id=$DEVICE" -derivedDataPath build/simulator -resultBundlePath build/tests.xcresult CODE_SIGNING_ALLOWED=NO test-without-building >> build-test.log 2>&1 || { tail -n 160 build-test.log; exit 1; }
           xcrun simctl install "$DEVICE" build/simulator/Build/Products/Debug-iphonesimulator/ScanCenter.app
           xcrun simctl launch "$DEVICE" cyou.actart.scancenter
           sleep 4

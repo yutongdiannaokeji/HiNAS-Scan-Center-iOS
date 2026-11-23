@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 import subprocess
 from urllib.error import HTTPError
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 import os
 
@@ -12,6 +12,7 @@ cli = argparse.ArgumentParser()
 cli.add_argument('method', choices=('GET', 'POST', 'PATCH'))
 cli.add_argument('path')
 cli.add_argument('--json')
+cli.add_argument('--upload', type=Path)
 cli.add_argument('--output', type=Path)
 args = cli.parse_args()
 env = dict(os.environ, GIT_TERMINAL_PROMPT='0', GCM_INTERACTIVE='never')
@@ -23,10 +24,18 @@ if not token:
     raise SystemExit('A GitHub credential is required in the system credential manager.')
 if not args.path.startswith('/') or args.path.startswith('//'):
     raise SystemExit('Expected a GitHub API path.')
-body = Path(args.json).read_bytes() if args.json else None
-request = Request('https://api.github.com'+args.path, data=body, method=args.method, headers={
+if args.upload and (args.method != 'POST' or args.json):
+    raise SystemExit('Artifact uploads require POST and no JSON payload.')
+body = args.upload.read_bytes() if args.upload else (Path(args.json).read_bytes() if args.json else None)
+endpoint = 'https://api.github.com'+args.path
+if args.upload:
+    import re
+    if not re.fullmatch(r'/repos/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/releases/[0-9]+/assets', args.path):
+        raise SystemExit('Artifact uploads require a release assets path.')
+    endpoint = 'https://uploads.github.com'+args.path+'?name='+quote(args.upload.name)
+request = Request(endpoint, data=body, method=args.method, headers={
     'Authorization': 'Bearer '+token, 'Accept': 'application/vnd.github+json',
-    'Content-Type': 'application/json', 'User-Agent': 'HiNAS-ScanCenter-build'})
+    'Content-Type': 'application/octet-stream' if args.upload else 'application/json', 'User-Agent': 'HiNAS-ScanCenter-build'})
 class ArtifactRedirect(HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         redirected = super().redirect_request(req, fp, code, msg, headers, newurl)
@@ -39,7 +48,7 @@ try:
         data = response.read()
 except HTTPError as error:
     print('GitHub HTTP', error.code)
-    print(error.read(1500).decode())
+    print(error.read(1500).decode('utf-8', 'replace').encode('ascii', 'backslashreplace').decode())
     raise SystemExit(1)
 if args.output:
     args.output.parent.mkdir(exist_ok=True, parents=True)

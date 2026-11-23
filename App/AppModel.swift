@@ -13,7 +13,6 @@ import SwiftUI
     @Published var error: String?
     @Published var progress: Double?
     @Published var pending: PendingScan?
-    @Published var exportURL: URL?
     @Published var tab = 0
     @Published var printCaps: PrintCapabilities?
     @Published var printFile: URL?
@@ -23,7 +22,6 @@ import SwiftUI
     @Published var printStatus = "选择 PDF、照片或文字。"
     @Published var printProgress: Double?
     @Published var printing = false
-    @Published var libraryError: String?
     let library: DocumentLibrary
     private(set) var client: HiNASClient?
     private var scanTask: Task<Void, Never>?
