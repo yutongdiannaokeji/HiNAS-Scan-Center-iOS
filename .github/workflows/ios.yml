@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   ios:
-    runs-on: macos-15
+    runs-on: macos-15-intel
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
@@ -20,7 +20,13 @@ jobs:
           python3 tools/icon.py
           xcodegen generate
           xcodebuild -version
+      - name: Build iPhone and iPad arm64 app
+        timeout-minutes: 10
+        run: |
+          xcodebuild -project ScanCenter.xcodeproj -scheme ScanCenter -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build/device -disableAutomaticPackageResolution -skipPackageUpdates CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO ARCHS=arm64 build > build-device.log 2>&1 || { tail -n 160 build-device.log; exit 1; }
+          python3 tools/package_ipa.py build/device/Build/Products/Release-iphoneos/ScanCenter.app dist
       - name: Build and test simulator
+        timeout-minutes: 12
         run: |
           xcodebuild -project ScanCenter.xcodeproj -scheme ScanCenter -destination 'generic/platform=iOS Simulator' -derivedDataPath build/simulator CODE_SIGNING_ALLOWED=NO ARCHS=$(uname -m) build-for-testing > build-test.log 2>&1 || { tail -n 160 build-test.log; exit 1; }
           python3 tools/simulator.py > /tmp/scan-center-simulator
@@ -31,10 +37,6 @@ jobs:
           sleep 4
           mkdir -p dist
           xcrun simctl io "$DEVICE" screenshot dist/iPhone.png
-      - name: Build iPhone and iPad arm64 app
-        run: |
-          xcodebuild -project ScanCenter.xcodeproj -scheme ScanCenter -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build/device CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO ARCHS=arm64 build > build-device.log 2>&1 || { tail -n 160 build-device.log; exit 1; }
-          python3 tools/package_ipa.py build/device/Build/Products/Release-iphoneos/ScanCenter.app dist
       - name: Upload IPA and evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

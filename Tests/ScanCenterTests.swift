@@ -16,7 +16,7 @@ final class ScanCenterTests: XCTestCase {
         }
     }
 
-    @MainActor func testPageIDsAndDPI() throws {
+    @MainActor func testPageIDsAndDPI() async throws {
         XCTAssertTrue(HiNASClient.validPage("page-10.png"))
         XCTAssertFalse(HiNASClient.validPage("page-11.png"))
         XCTAssertFalse(HiNASClient.validPage("../original.png"))
@@ -49,5 +49,14 @@ final class ScanCenterTests: XCTestCase {
         let document = try XCTUnwrap(PDFDocument(url: output))
         XCTAssertEqual(document.pageCount, 2)
         XCTAssertEqual(document.page(at: 0)!.bounds(for: .mediaBox).width, 0.24, accuracy: 0.001)
+        XCTAssertEqual(document.page(at: 1)!.bounds(for: .mediaBox).width, 0.36, accuracy: 0.001)
+        let source = try FileHandle(forReadingFrom: file)
+        defer { try? source.close() }
+        let pdfBytes = try Data(contentsOf: output)
+        for chunk in info.chunks {
+            try source.seek(toOffset: chunk.offset)
+            let compressed = try XCTUnwrap(source.read(upToCount: chunk.size))
+            XCTAssertNotNil(pdfBytes.range(of: compressed), "The PDF must preserve original PNG compressed pixels.")
+        }
     }
 }
