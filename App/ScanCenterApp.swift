@@ -28,7 +28,7 @@ import SwiftUI
 struct RootView: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @AppStorage("darkAppearance") private var dark = false
+    @AppStorage("appearance") private var appearance = "system"
     var body: some View {
         TabView(selection: $model.tab) {
             ScanView().tabItem { Label("扫描", systemImage: "scanner") }.tag(0)
@@ -38,7 +38,7 @@ struct RootView: View {
         }
         .adaptiveNavigation()
         .tint(Color(red: 0.16, green: 0.48, blue: 0.36))
-        .preferredColorScheme(dark ? .dark : .light)
+        .preferredColorScheme(appearance == "dark" ? .dark : appearance == "light" ? .light : nil)
         .environment(\.dynamicTypeSize, CommandLine.arguments.contains("--large-type") ? .accessibility2 : dynamicTypeSize)
         .onAppear {
             if let index = CommandLine.arguments.firstIndex(of: "--screen"), CommandLine.arguments.count > index + 1,
@@ -52,7 +52,7 @@ struct RootView: View {
 
 struct ConnectionView: View {
     @EnvironmentObject private var model: AppModel
-    @AppStorage("darkAppearance") private var dark = false
+    @AppStorage("appearance") private var appearance = "system"
     var body: some View {
         NavigationStack {
             Form {
@@ -79,7 +79,13 @@ struct ConnectionView: View {
                         LabeledContent("采集", value: "24 位彩色")
                     }
                 }
-                Section { Toggle("深色外观", isOn: $dark) }
+                Section {
+                    Picker("外观", selection: $appearance) {
+                        Text("跟随系统").tag("system")
+                        Text("浅色").tag("light")
+                        Text("深色").tag("dark")
+                    }
+                }
                 Section {
                     Text("本机文档可在“文件”App 的 Scan Center 目录中访问。扫描期间请保持 App 在前台，离开后可重新连接并继续接收同一任务。")
                         .font(.footnote).foregroundStyle(.secondary)
