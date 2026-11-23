@@ -3,6 +3,12 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      family:
+        description: Device family to verify
+        type: choice
+        options: [all, iPhone, iPad]
+        default: all
 permissions:
   contents: read
 concurrency:
@@ -11,11 +17,11 @@ concurrency:
 jobs:
   ios:
     name: iOS 26 - ${{ matrix.family }}
-    runs-on: macos-15-intel
+    runs-on: ${{ matrix.family == 'iPad' && 'macos-15' || 'macos-15-intel' }}
     strategy:
       fail-fast: false
       matrix:
-        family: [iPhone, iPad]
+        family: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.family == 'iPad' && '["iPad"]' || github.event_name == 'workflow_dispatch' && inputs.family == 'iPhone' && '["iPhone"]' || '["iPhone","iPad"]') }}
     timeout-minutes: 30
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer

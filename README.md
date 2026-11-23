@@ -23,6 +23,8 @@
 
 在 Windows 上可使用 [Sideloadly 官方版](https://sideloadly.io/)，连接并信任 iPhone，将 IPA 拖入工具，用自己的 Apple 账号在本机完成签名和安装。免费账号通常需要每 7 天续签，工具支持自动续签。Apple 账号密码与验证码直接在安装工具里输入。
 
+安装后按系统提示信任开发者。若系统提示需要开发者模式，在设备设置中完成开启及重启确认，再打开 App。详见 [Apple 开发者模式说明](https://developer.apple.com/documentation/xcode/enabling-developer-mode-on-a-device)。
+
 也可在 Mac 用 Xcode 打开生成的工程，将 Signing Team 设为自己的团队，再安装到连接的设备。注册设备分发需要匹配的证书及描述文件。详见 [Apple 设备安装说明](https://developer.apple.com/documentation/xcode/distributing-apps-to-your-development-devices)。
 
 ## 本机编译
@@ -39,7 +41,7 @@ xcodebuild -project ScanCenter.xcodeproj -scheme ScanCenter \
 python3 tools/package_ipa.py build/device/Build/Products/Release-iphoneos/ScanCenter.app dist
 ```
 
-GitHub Actions 的 `Build iOS IPA` 工作流执行模拟器编译与测试、启动截图，再编译 iphoneos arm64 并校验 IPA 平台及 SHA-256。构建任务里可以下载 `ScanCenter-iOS` 附件。
+GitHub Actions 的 `Build iOS IPA` 工作流在独立构建机上检查 iPhone 和 iPad。界面测试等待实际按钮可点击，并检查导航，再保存四个页面、深色外观和大字体截图。真机包使用 iphoneos arm64 编译并校验平台及 SHA-256。构建任务提供 `ScanCenter-iPhone` 和 `ScanCenter-iPad` 附件。
 
 ## 验证范围
 
