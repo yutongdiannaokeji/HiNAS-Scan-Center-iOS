@@ -4,11 +4,12 @@ import json
 from pathlib import Path
 import subprocess
 from urllib.error import HTTPError
-from urllib.request import Request, urlopen
+from urllib.parse import urlsplit
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 import os
 
 cli = argparse.ArgumentParser()
-cli.add_argument('method', choices=('GET', 'POST'))
+cli.add_argument('method', choices=('GET', 'POST', 'PATCH'))
 cli.add_argument('path')
 cli.add_argument('--json')
 cli.add_argument('--output', type=Path)
@@ -26,8 +27,15 @@ body = Path(args.json).read_bytes() if args.json else None
 request = Request('https://api.github.com'+args.path, data=body, method=args.method, headers={
     'Authorization': 'Bearer '+token, 'Accept': 'application/vnd.github+json',
     'Content-Type': 'application/json', 'User-Agent': 'HiNAS-ScanCenter-build'})
+class ArtifactRedirect(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        redirected = super().redirect_request(req, fp, code, msg, headers, newurl)
+        if redirected and urlsplit(newurl).hostname != 'api.github.com':
+            redirected.remove_header('Authorization')
+        return redirected
+
 try:
-    with urlopen(request, timeout=45) as response:
+    with build_opener(ArtifactRedirect()).open(request, timeout=45) as response:
         data = response.read()
 except HTTPError as error:
     print('GitHub HTTP', error.code)
