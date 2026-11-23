@@ -1,0 +1,11 @@
+build/
+dist/
+.DS_Store
+*.xcuserstate
+xcuserdata/
+*.mobileprovision
+*.p12
+*.p8
+*.cer
+*.ipa
+

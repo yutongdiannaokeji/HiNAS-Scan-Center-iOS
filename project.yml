@@ -1,0 +1,40 @@
+name: ScanCenter
+options:
+  bundleIdPrefix: cyou.actart
+  deploymentTarget:
+    iOS: "16.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: 1
+    TARGETED_DEVICE_FAMILY: "1,2"
+    CODE_SIGNING_ALLOWED: NO
+targets:
+  ScanCenter:
+    type: application
+    platform: iOS
+    sources: [App]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: cyou.actart.scancenter
+        INFOPLIST_FILE: App/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        GENERATE_INFOPLIST_FILE: NO
+  ScanCenterTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [Tests]
+    dependencies:
+      - target: ScanCenter
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  ScanCenter:
+    build:
+      targets:
+        ScanCenter: all
+    test:
+      targets: [ScanCenterTests]
+
