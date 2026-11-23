@@ -1,5 +1,12 @@
 import SwiftUI
 
+struct PreviewTextSize: ViewModifier {
+    func body(content: Content) -> some View {
+        if CommandLine.arguments.contains("--large-type") { content.dynamicTypeSize(.accessibility2) }
+        else { content }
+    }
+}
+
 private struct NativePrimaryAction: ViewModifier {
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {

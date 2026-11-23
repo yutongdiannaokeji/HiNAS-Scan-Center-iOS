@@ -30,11 +30,21 @@ targets:
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
+  ScanCenterUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [UITests]
+    dependencies:
+      - target: ScanCenter
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: ScanCenter
 schemes:
   ScanCenter:
     build:
       targets:
         ScanCenter: all
     test:
-      targets: [ScanCenterTests]
+      targets: [ScanCenterTests, ScanCenterUITests]
 

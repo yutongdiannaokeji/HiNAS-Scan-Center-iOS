@@ -10,7 +10,12 @@ concurrency:
   cancel-in-progress: true
 jobs:
   ios:
+    name: iOS 26 - ${{ matrix.family }}
     runs-on: macos-15-intel
+    strategy:
+      fail-fast: false
+      matrix:
+        family: [iPhone, iPad]
     timeout-minutes: 30
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
@@ -23,56 +28,48 @@ jobs:
           xcodegen generate
           xcodebuild -version
           xcrun --sdk iphoneos --show-sdk-version
-      - name: Build iPhone and iPad arm64 app
+      - name: Build iPhone and iPad arm64 IPA
+        if: matrix.family == 'iPhone'
         timeout-minutes: 10
         run: |
           xcodebuild -project ScanCenter.xcodeproj -scheme ScanCenter -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build/device -disableAutomaticPackageResolution -skipPackageUpdates CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO ARCHS=arm64 build > build-device.log 2>&1 || { tail -n 160 build-device.log; exit 1; }
           python3 tools/package_ipa.py build/device/Build/Products/Release-iphoneos/ScanCenter.app dist
-      - name: Build and test simulator
-        timeout-minutes: 12
-        run: |
-          xcodebuild -project ScanCenter.xcodeproj -scheme ScanCenter -destination 'generic/platform=iOS Simulator' -derivedDataPath build/simulator CODE_SIGNING_ALLOWED=NO ARCHS=$(uname -m) build-for-testing > build-test.log 2>&1 || { tail -n 160 build-test.log; exit 1; }
-          python3 tools/simulator.py --family iPhone --major 26 > /tmp/scan-center-simulator
-          DEVICE=$(cat /tmp/scan-center-simulator)
-          xcodebuild -project ScanCenter.xcodeproj -scheme ScanCenter -destination "platform=iOS Simulator,id=$DEVICE" -derivedDataPath build/simulator -resultBundlePath build/tests.xcresult CODE_SIGNING_ALLOWED=NO test-without-building >> build-test.log 2>&1 || { tail -n 160 build-test.log; exit 1; }
-          xcrun simctl install "$DEVICE" build/simulator/Build/Products/Debug-iphonesimulator/ScanCenter.app
-          xcrun simctl launch "$DEVICE" cyou.actart.scancenter
-          sleep 4
-          mkdir -p dist
-          xcrun simctl io "$DEVICE" screenshot dist/iPhone.png
-          for SCREEN in 1 2 3; do
-            xcrun simctl terminate "$DEVICE" cyou.actart.scancenter
-            xcrun simctl launch "$DEVICE" cyou.actart.scancenter --screen "$SCREEN"
-            sleep 2
-            xcrun simctl io "$DEVICE" screenshot "dist/iPhone-$SCREEN.png"
-          done
-          xcrun simctl ui "$DEVICE" appearance dark
-          xcrun simctl terminate "$DEVICE" cyou.actart.scancenter
-          xcrun simctl launch "$DEVICE" cyou.actart.scancenter --screen 0
-          sleep 2
-          xcrun simctl io "$DEVICE" screenshot dist/iPhone-dark.png
-          xcrun simctl ui "$DEVICE" appearance light
-          xcrun simctl terminate "$DEVICE" cyou.actart.scancenter
-          xcrun simctl launch "$DEVICE" cyou.actart.scancenter --screen 0 --large-type
-          sleep 2
-          xcrun simctl io "$DEVICE" screenshot dist/iPhone-large-type.png
-      - name: Check native iPad layout
+      - name: Compile simulator and UI checks
         timeout-minutes: 8
         run: |
-          python3 tools/simulator.py --family iPad --major 26 > /tmp/scan-center-ipad
-          DEVICE=$(cat /tmp/scan-center-ipad)
-          xcrun simctl install "$DEVICE" build/simulator/Build/Products/Debug-iphonesimulator/ScanCenter.app
-          xcrun simctl launch "$DEVICE" cyou.actart.scancenter
-          sleep 4
-          xcrun simctl io "$DEVICE" screenshot dist/iPad.png
+          xcodebuild -project ScanCenter.xcodeproj -scheme ScanCenter -destination 'generic/platform=iOS Simulator' -derivedDataPath build/simulator CODE_SIGNING_ALLOWED=NO ARCHS=$(uname -m) build-for-testing > build-compile.log 2>&1 || { tail -n 160 build-compile.log; exit 1; }
+      - name: Boot one simulator
+        timeout-minutes: 8
+        run: |
+          xcrun simctl shutdown all
+          python3 tools/simulator.py --family '${{ matrix.family }}' --major 26 > /tmp/scan-center-device
+      - name: Verify visible screens and PDF behavior
+        timeout-minutes: 10
+        run: |
+          DEVICE=$(cat /tmp/scan-center-device)
+          set +e
+          xcodebuild -project ScanCenter.xcodeproj -scheme ScanCenter -destination "platform=iOS Simulator,id=$DEVICE" -derivedDataPath build/simulator -resultBundlePath build/tests.xcresult -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO test-without-building > build-test.log 2>&1
+          RESULT=$?
+          set -e
+          tail -n 100 build-test.log
+          exit "$RESULT"
+      - name: Export actual UI screenshots
+        if: always()
+        run: |
+          if [ -d build/tests.xcresult ]; then
+            mkdir -p dist
+            xcrun xcresulttool export attachments --path build/tests.xcresult --output-path dist/attachments
+            python3 tools/export_previews.py '${{ matrix.family }}'
+          fi
       - name: Upload IPA and evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: ScanCenter-iOS
+          name: ScanCenter-${{ matrix.family }}
           path: |
             dist/
             build-test.log
             build-device.log
+            build-compile.log
           retention-days: 14
 

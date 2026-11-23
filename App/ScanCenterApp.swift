@@ -27,19 +27,13 @@ import SwiftUI
 
 struct RootView: View {
     @EnvironmentObject private var model: AppModel
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @AppStorage("appearance") private var appearance = "system"
     var body: some View {
-        TabView(selection: $model.tab) {
-            ScanView().tabItem { Label("扫描", systemImage: "scanner") }.tag(0)
-            DocumentsView().tabItem { Label("文档", systemImage: "doc.on.doc") }.tag(1)
-            PrintView().tabItem { Label("打印", systemImage: "printer") }.tag(2)
-            ConnectionView().tabItem { Label("设备", systemImage: "wifi") }.tag(3)
-        }
+        navigation
         .adaptiveNavigation()
         .tint(Color(red: 0.16, green: 0.48, blue: 0.36))
-        .preferredColorScheme(appearance == "dark" ? .dark : appearance == "light" ? .light : nil)
-        .environment(\.dynamicTypeSize, CommandLine.arguments.contains("--large-type") ? .accessibility2 : dynamicTypeSize)
+        .preferredColorScheme(CommandLine.arguments.contains("--dark-mode") ? .dark : appearance == "dark" ? .dark : appearance == "light" ? .light : nil)
+        .modifier(PreviewTextSize())
         .onAppear {
             if let index = CommandLine.arguments.firstIndex(of: "--screen"), CommandLine.arguments.count > index + 1,
                let tab = Int(CommandLine.arguments[index + 1]), (0...3).contains(tab) { model.tab = tab }
@@ -47,6 +41,24 @@ struct RootView: View {
         .alert("请检查", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) {
             Button("知道了") { model.error = nil }
         } message: { Text(model.error ?? "") }
+    }
+
+    @ViewBuilder private var navigation: some View {
+        if #available(iOS 18.0, *) {
+            TabView(selection: $model.tab) {
+                Tab("扫描", systemImage: "scanner", value: 0) { ScanView() }
+                Tab("文档", systemImage: "doc.on.doc", value: 1) { DocumentsView() }
+                Tab("打印", systemImage: "printer", value: 2) { PrintView() }
+                Tab("设备", systemImage: "wifi", value: 3) { ConnectionView() }
+            }
+        } else {
+            TabView(selection: $model.tab) {
+                ScanView().tabItem { Label("扫描", systemImage: "scanner") }.tag(0)
+                DocumentsView().tabItem { Label("文档", systemImage: "doc.on.doc") }.tag(1)
+                PrintView().tabItem { Label("打印", systemImage: "printer") }.tag(2)
+                ConnectionView().tabItem { Label("设备", systemImage: "wifi") }.tag(3)
+            }
+        }
     }
 }
 
@@ -177,7 +189,7 @@ struct ScanView: View {
         if !model.connected {
             Button { model.tab = 3 } label: {
                 Label("连接设备", systemImage: "wifi").frame(maxWidth: .infinity, minHeight: 28)
-            }.nativePrimaryAction().disabled(model.busy)
+            }.nativePrimaryAction().disabled(model.busy).accessibilityIdentifier("connectDeviceAction")
         } else if let pending = model.pending {
             HStack(spacing: 12) {
                 if !model.busy && pending.jobID != nil {
